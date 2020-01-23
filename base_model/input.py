@@ -4,11 +4,14 @@ import numpy as np
 class DataInput:
     def __init__(self, data, batch_size):
 
+        # number of samples in one batch
         self.batch_size = batch_size
         self.data = data
-        self.epoch_size = len(self.data) // self.batch_size
-        if self.epoch_size * self.batch_size < len(self.data):
+        # number of epochs
+        self.epoch_size = len(self.data) // self.batch_size  # // operator floor
+        if self.epoch_size * self.batch_size < len(self.data):  # operator ceiling
             self.epoch_size += 1
+        # current epoch number
         self.i = 0
 
     def __iter__(self):
@@ -20,7 +23,7 @@ class DataInput:
             raise StopIteration
 
         ts = self.data[self.i * self.batch_size: min((self.i + 1) * self.batch_size,
-                                                     len(self.data))]
+                                                     len(self.data))]  # retrieve test set
         self.i += 1
 
         u, i, y, sl = [], [], [], []
