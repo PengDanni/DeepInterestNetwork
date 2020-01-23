@@ -7,11 +7,11 @@ class DataInput:
         # number of samples in one batch
         self.batch_size = batch_size
         self.data = data
-        # number of epochs
+        # number of batches in one epoch
         self.epoch_size = len(self.data) // self.batch_size  # // operator floor
         if self.epoch_size * self.batch_size < len(self.data):  # operator ceiling
             self.epoch_size += 1
-        # current epoch number
+        # current batch number
         self.i = 0
 
     def __iter__(self):
@@ -23,15 +23,15 @@ class DataInput:
             raise StopIteration
 
         ts = self.data[self.i * self.batch_size: min((self.i + 1) * self.batch_size,
-                                                     len(self.data))]  # retrieve test set
+                                                     len(self.data))]  # retrieve train samples for current batch
         self.i += 1
 
         u, i, y, sl = [], [], [], []
         for t in ts:
-            u.append(t[0])
-            i.append(t[2])
-            y.append(t[3])
-            sl.append(len(t[1]))
+            u.append(t[0])  # user
+            i.append(t[2])  # item
+            y.append(t[3])  # label
+            sl.append(len(t[1]))  # shopping list / history
         max_sl = max(sl)
 
         hist_i = np.zeros([len(ts), max_sl], np.int64)
