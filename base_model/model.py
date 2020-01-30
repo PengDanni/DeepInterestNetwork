@@ -7,32 +7,32 @@ from tensorflow.python.ops.rnn_cell import MultiRNNCell
 class Model(object):
 
   def __init__(self, user_count, item_count, cate_count, cate_list):
-
-    self.u = tf.placeholder(tf.int32, [None,]) # [B]
-    self.i = tf.placeholder(tf.int32, [None,]) # [B]
-    self.j = tf.placeholder(tf.int32, [None,]) # [B]
+    # batch list
+    self.u = tf.placeholder(tf.int32, [None,]) # [B] [None,]?????
+    self.i = tf.placeholder(tf.int32, [None,]) # [B] positive items
+    self.j = tf.placeholder(tf.int32, [None,]) # [B] negative items
     self.y = tf.placeholder(tf.float32, [None,]) # [B]
     self.hist_i = tf.placeholder(tf.int32, [None, None]) # [B, T]
     self.sl = tf.placeholder(tf.int32, [None,]) # [B]
-    self.lr = tf.placeholder(tf.float64, [])
+    self.lr = tf.placeholder(tf.float64, [])  # scalar
 
     hidden_units = 128
 
     user_emb_w = tf.get_variable("user_emb_w", [user_count, hidden_units])
     item_emb_w = tf.get_variable("item_emb_w", [item_count, hidden_units // 2])
     item_b = tf.get_variable("item_b", [item_count],
-                             initializer=tf.constant_initializer(0.0))
+                             initializer=tf.constant_initializer(0.0))  # bias associated with item
     cate_emb_w = tf.get_variable("cate_emb_w", [cate_count, hidden_units // 2])
-    cate_list = tf.convert_to_tensor(cate_list, dtype=tf.int64)
+    cate_list = tf.convert_to_tensor(cate_list, dtype=tf.int64)  # convert list to tensor before use tf function on it
 
-    u_emb = tf.nn.embedding_lookup(user_emb_w, self.u)
+    u_emb = tf.nn.embedding_lookup(user_emb_w, self.u)  # ??????? user embedding determined from the history items
 
-    ic = tf.gather(cate_list, self.i)
+    ic = tf.gather(cate_list, self.i)  # Gather slices from params according to indices
     i_emb = tf.concat(values = [
         tf.nn.embedding_lookup(item_emb_w, self.i),
         tf.nn.embedding_lookup(cate_emb_w, ic),
         ], axis=1)
-    i_b = tf.gather(item_b, self.i)
+    i_b = tf.gather(item_b, self.i)  #
 
     jc = tf.gather(cate_list, self.j)
     j_emb = tf.concat([
@@ -48,35 +48,39 @@ class Model(object):
         ], axis=2)
 
     #-- sum begin -------
-    mask = tf.sequence_mask(self.sl, tf.shape(h_emb)[1], dtype=tf.float32) # [B, T]
+    mask = tf.sequence_mask(self.sl, tf.shape(h_emb)[1], dtype=tf.float32) # [B, T] Returns a mask tensor representing the first N positions of each cell.
     mask = tf.expand_dims(mask, -1) # [B, T, 1]
-    mask = tf.tile(mask, [1, 1, tf.shape(h_emb)[2]]) # [B, T, H]
+    mask = tf.tile(mask, [1, 1, tf.shape(h_emb)[2]]) # [B, T, H] This operation creates a new tensor by replicating input multiples times
     h_emb *= mask # [B, T, H]
     hist = h_emb
-    hist = tf.reduce_sum(hist, 1) 
-    hist = tf.div(hist, tf.cast(tf.tile(tf.expand_dims(self.sl,1), [1,128]), tf.float32))
-    print h_emb.get_shape().as_list()
+    hist = tf.reduce_sum(hist, 1)  # Computes the sum of elements across dimensions of a tensor
+    hist = tf.div(hist, tf.cast(tf.tile(tf.expand_dims(self.sl,1), [1,128]), tf.float32))  # Divides x / y elementwise （sum average). Casts a tensor to a new type.
+    print(h_emb.get_shape().as_list())
     #-- sum end ---------
     
     hist = tf.layers.batch_normalization(inputs = hist)
-    hist = tf.reshape(hist, [-1, hidden_units])
+    hist = tf.reshape(hist, [-1, hidden_units])  # -1 means define automatically
     hist = tf.layers.dense(hist, hidden_units)
 
-    u_emb = hist
+    u_emb = hist   # user embedding determined from the history items
     #-- fcn begin -------
     din_i = tf.concat([u_emb, i_emb], axis=-1)
     din_i = tf.layers.batch_normalization(inputs=din_i, name='b1')
-    d_layer_1_i = tf.layers.dense(din_i, 80, activation=tf.nn.sigmoid, name='f1')
+    d_layer_1_i = tf.layers.dense(din_i, 80, activation=tf.nn.sigmoid, name='f1')   # [200, 80, 40, 1, 2]
     d_layer_2_i = tf.layers.dense(d_layer_1_i, 40, activation=tf.nn.sigmoid, name='f2')
     d_layer_3_i = tf.layers.dense(d_layer_2_i, 1, activation=None, name='f3')
+
     din_j = tf.concat([u_emb, j_emb], axis=-1)
     din_j = tf.layers.batch_normalization(inputs=din_j, name='b1', reuse=True)
     d_layer_1_j = tf.layers.dense(din_j, 80, activation=tf.nn.sigmoid, name='f1', reuse=True)
     d_layer_2_j = tf.layers.dense(d_layer_1_j, 40, activation=tf.nn.sigmoid, name='f2', reuse=True)
     d_layer_3_j = tf.layers.dense(d_layer_2_j, 1, activation=None, name='f3', reuse=True)
+
     d_layer_3_i = tf.reshape(d_layer_3_i, [-1])
     d_layer_3_j = tf.reshape(d_layer_3_j, [-1])
-    x = i_b - j_b + d_layer_3_i - d_layer_3_j # [B]
+
+    x = i_b - j_b + d_layer_3_i - d_layer_3_j  # [B] ??????
+
     self.logits = i_b + d_layer_3_i
     u_emb_all = tf.expand_dims(u_emb, 1)
     u_emb_all = tf.tile(u_emb_all, [1, item_count, 1])

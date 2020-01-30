@@ -29,9 +29,9 @@ class DataInput:
         u, i, y, sl = [], [], [], []
         for t in ts:
             u.append(t[0])  # user
-            i.append(t[2])  # item
+            i.append(t[2])  # item (including positive and negative samples)
             y.append(t[3])  # label
-            sl.append(len(t[1]))  # shopping history length
+            sl.append(len(t[1]))  # shopping history length / sequence length
         max_sl = max(sl)
 
         hist_i = np.zeros([len(ts), max_sl], np.int64)  # create a 0 padded numpy matrix of shape(ts_size, max_hist_len)
